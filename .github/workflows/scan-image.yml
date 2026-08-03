@@ -50,7 +50,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
+          
+      - name: Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: "quay.io"
+          username: ${{ secrets.QUAY_AIPCC_USERNAME }}
+          password: ${{ secrets.QUAY_AIPCC_TOKEN }}
+          
       - name: Install scanquaycve
         run: pip install .
 
