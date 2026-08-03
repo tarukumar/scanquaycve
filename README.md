@@ -63,6 +63,14 @@ scanquaycve quay.io/org/image:latest \
 
 With uv, prefix the same commands with `uv run` (e.g. `uv run scanquaycve …`).
 
+## GitHub Actions
+
+Use **Actions → Scan Quay image → Run workflow** and pass an image reference.
+
+For private Quay repos, add a repository secret named `QUAY_TOKEN` (OAuth token with `repo:read`).
+
+Reports are uploaded as the `scanquaycve-reports` artifact. By default the job fails when matching vulnerabilities are found.
+
 ### Options
 
 | Flag | Description |

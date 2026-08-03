@@ -1,0 +1,105 @@
+name: Scan Quay image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Image reference (e.g. quay.io/org/image:tag)"
+        required: true
+        type: string
+      min_severity:
+        description: "Minimum severity to include (Critical > High > Medium > Low > Negligible > Unknown)"
+        required: false
+        default: "High"
+        type: choice
+        options:
+          - Critical
+          - High
+          - Medium
+          - Low
+          - Negligible
+          - Unknown
+      fixable_only:
+        description: "Only include CVEs with a known fix"
+        required: false
+        default: false
+        type: boolean
+      arch:
+        description: "Architecture for multi-arch tags"
+        required: false
+        default: "amd64"
+        type: string
+      fail_on_findings:
+        description: "Fail the job when any matching vulnerabilities are found"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan ${{ inputs.image }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scanquaycve
+        run: pip install .
+
+      - name: Run vulnerability scan
+        env:
+          QUAY_TOKEN: ${{ secrets.QUAY_TOKEN }}
+          IMAGE: ${{ inputs.image }}
+          MIN_SEVERITY: ${{ inputs.min_severity }}
+          FIXABLE_ONLY: ${{ inputs.fixable_only }}
+          ARCH: ${{ inputs.arch }}
+        run: |
+          set -euo pipefail
+          args=(
+            "$IMAGE"
+            --min-severity "$MIN_SEVERITY"
+            --arch "$ARCH"
+            -o reports
+            --json
+          )
+          if [[ "$FIXABLE_ONLY" == "true" ]]; then
+            args+=(--fixable-only)
+          fi
+          if [[ -n "${QUAY_TOKEN:-}" ]]; then
+            args+=(--token "$QUAY_TOKEN")
+          fi
+          scanquaycve "${args[@]}"
+
+      - name: Upload scan reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanquaycve-reports
+          path: reports/
+          if-no-files-found: warn
+
+      - name: Fail on findings
+        if: ${{ inputs.fail_on_findings }}
+        env:
+          IMAGE: ${{ inputs.image }}
+        run: |
+          set -euo pipefail
+          summary="$(find reports -name summary.json | head -n 1 || true)"
+          if [[ -z "$summary" ]]; then
+            echo "No summary.json found; skipping fail-on-findings check."
+            exit 0
+          fi
+          total="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["total"])' "$summary")"
+          echo "Matching vulnerabilities: $total"
+          if [[ "$total" -gt 0 ]]; then
+            echo "::error::Found $total matching vulnerabilities in $IMAGE"
+            exit 1
+          fi
