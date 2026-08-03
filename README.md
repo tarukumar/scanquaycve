@@ -4,11 +4,26 @@ Scan Quay/Clair vulnerability reports for a container image by **tag** or **dige
 
 ## Requirements
 
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
+- Python 3.12+ (stdlib only — no third-party runtime deps)
 - For private repos: `podman login quay.io` / `docker login quay.io`, or an OAuth `--token`
 
 ## Setup
+
+### Plain Python / pip
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
+Or run from a checkout without installing:
+
+```bash
+PYTHONPATH=src python3 -m scanquaycve quay.io/org/image:latest
+```
+
+### uv (optional, for development)
 
 ```bash
 uv sync --group dev
@@ -20,31 +35,33 @@ Pass a single IMAGE reference:
 
 ```bash
 # by tag
-uv run scanquaycve quay.io/org/image:1.2.3
+scanquaycve quay.io/org/image:1.2.3
 
 # short form (server defaults to quay.io)
-uv run scanquaycve org/image:latest
+scanquaycve org/image:latest
 
 # by digest
-uv run scanquaycve quay.io/org/image@sha256:abc123...
+scanquaycve quay.io/org/image@sha256:abc123...
 
 # only High and Medium
-uv run scanquaycve quay.io/org/image:latest -s High,Medium
+scanquaycve quay.io/org/image:latest -s High,Medium
 
 # same thing, repeatable flags (case-insensitive)
-uv run scanquaycve quay.io/org/image:latest -s high -s medium
+scanquaycve quay.io/org/image:latest -s high -s medium
 
 # Critical + High (and anything more severe than the floor)
-uv run scanquaycve quay.io/org/image:latest --min-severity High
+scanquaycve quay.io/org/image:latest --min-severity High
 
 # severity + fixable filter
-uv run scanquaycve quay.io/org/image:latest \
+scanquaycve quay.io/org/image:latest \
   --min-severity Medium \
   --fixable-only \
   -o reports \
   --json \
   --token "$QUAY_TOKEN"
 ```
+
+With uv, prefix the same commands with `uv run` (e.g. `uv run scanquaycve …`).
 
 ### Options
 
@@ -77,9 +94,11 @@ Console also prints a severity x fixability summary.
 ## Development
 
 ```bash
-uv run ruff check .
-uv run mypy
-uv run pytest
+pip install -e . && pip install pytest ruff mypy
+# or: uv sync --group dev
+ruff check .
+mypy
+pytest
 ```
 
 ## Auth

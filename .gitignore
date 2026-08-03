@@ -1,0 +1,33 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python build / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Test / lint / type caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Tooling
+uv.lock
+
+# Scan output
+reports/
+csvs/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
