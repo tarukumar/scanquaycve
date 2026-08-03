@@ -78,6 +78,73 @@ jobs:
           fi
           scanquaycve "${args[@]}"
 
+      - name: Write job summary
+        if: always()
+        env:
+          IMAGE: ${{ inputs.image }}
+          MIN_SEVERITY: ${{ inputs.min_severity }}
+          FIXABLE_ONLY: ${{ inputs.fixable_only }}
+          ARCH: ${{ inputs.arch }}
+        run: |
+          python <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          summary_path = next(Path("reports").rglob("summary.json"), None)
+          out = os.environ["GITHUB_STEP_SUMMARY"]
+          image = os.environ.get("IMAGE", "")
+          min_sev = os.environ.get("MIN_SEVERITY", "")
+          fixable_only = os.environ.get("FIXABLE_ONLY", "false")
+          arch = os.environ.get("ARCH", "amd64")
+
+          lines = [
+              "## scanquaycve results",
+              "",
+              f"- **Image:** `{image}`",
+              f"- **Arch:** `{arch}`",
+              f"- **Min severity:** `{min_sev}`",
+              f"- **Fixable only:** `{fixable_only}`",
+              "",
+          ]
+
+          if summary_path is None:
+              lines += ["_No `summary.json` found — scan may have failed before writing reports._", ""]
+              Path(out).write_text("\n".join(lines), encoding="utf-8")
+              raise SystemExit(0)
+
+          data = json.loads(summary_path.read_text(encoding="utf-8"))
+          meta = data.get("meta", {})
+          digest = meta.get("digest", "")
+          status = meta.get("status", "")
+          total = data.get("total", 0)
+          fixable = data.get("fixable", 0)
+          non_fixable = data.get("non_fixable", 0)
+
+          lines += [
+              f"- **Digest:** `{digest}`",
+              f"- **Scan status:** `{status}`",
+              f"- **Report:** `{summary_path.parent}`",
+              "",
+              "| Severity | Fixable | Non-fixable | Total |",
+              "| --- | ---: | ---: | ---: |",
+          ]
+          for sev, counts in (data.get("by_severity") or {}).items():
+              row_total = counts.get("total", 0)
+              if row_total == 0:
+                  continue
+              lines.append(
+                  f"| {sev} | {counts.get('fixable', 0)} | "
+                  f"{counts.get('non_fixable', 0)} | {row_total} |"
+              )
+          lines += [
+              f"| **TOTAL** | **{fixable}** | **{non_fixable}** | **{total}** |",
+              "",
+          ]
+          Path(out).write_text("\n".join(lines), encoding="utf-8")
+          print(f"Wrote job summary from {summary_path} (total={total})")
+          PY
+
       - name: Upload scan reports
         if: always()
         uses: actions/upload-artifact@v4
