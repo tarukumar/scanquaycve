@@ -94,16 +94,21 @@ jobs:
           ARCH: ${{ inputs.arch }}
         run: |
           python <<'PY'
+          import csv
           import json
           import os
           from pathlib import Path
 
+          MAX_DETAIL_ROWS = 200
           summary_path = next(Path("reports").rglob("summary.json"), None)
-          out = os.environ["GITHUB_STEP_SUMMARY"]
+          out = Path(os.environ["GITHUB_STEP_SUMMARY"])
           image = os.environ.get("IMAGE", "")
           min_sev = os.environ.get("MIN_SEVERITY", "")
           fixable_only = os.environ.get("FIXABLE_ONLY", "false")
           arch = os.environ.get("ARCH", "amd64")
+
+          def esc(value: object) -> str:
+              return str(value).replace("|", "\\|").replace("\n", " ")
 
           lines = [
               "## scanquaycve results",
@@ -116,10 +121,14 @@ jobs:
           ]
 
           if summary_path is None:
-              lines += ["_No `summary.json` found — scan may have failed before writing reports._", ""]
-              Path(out).write_text("\n".join(lines), encoding="utf-8")
+              lines += [
+                  "_No `summary.json` found — scan may have failed before writing reports._",
+                  "",
+              ]
+              out.write_text("\n".join(lines), encoding="utf-8")
               raise SystemExit(0)
 
+          report_dir = summary_path.parent
           data = json.loads(summary_path.read_text(encoding="utf-8"))
           meta = data.get("meta", {})
           digest = meta.get("digest", "")
@@ -131,7 +140,9 @@ jobs:
           lines += [
               f"- **Digest:** `{digest}`",
               f"- **Scan status:** `{status}`",
-              f"- **Report:** `{summary_path.parent}`",
+              f"- **Report:** `{report_dir}`",
+              "",
+              "### Counts by severity",
               "",
               "| Severity | Fixable | Non-fixable | Total |",
               "| --- | ---: | ---: | ---: |",
@@ -148,8 +159,50 @@ jobs:
               f"| **TOTAL** | **{fixable}** | **{non_fixable}** | **{total}** |",
               "",
           ]
-          Path(out).write_text("\n".join(lines), encoding="utf-8")
-          print(f"Wrote job summary from {summary_path} (total={total})")
+
+          csv_path = report_dir / "all-vulnerabilities.csv"
+          if not csv_path.is_file():
+              lines += ["_No vulnerability CSV found._", ""]
+              out.write_text("\n".join(lines), encoding="utf-8")
+              raise SystemExit(0)
+
+          with csv_path.open(newline="", encoding="utf-8") as fh:
+              rows = list(csv.DictReader(fh))
+
+          lines += [
+              "### Findings (package versions)",
+              "",
+              "| CVE | Severity | Package | Installed | Fixed by | Fixable |",
+              "| --- | --- | --- | --- | --- | --- |",
+          ]
+          shown = rows[:MAX_DETAIL_ROWS]
+          for row in shown:
+              cve = esc(row.get("CVE", ""))
+              link = (row.get("Link") or "").strip()
+              cve_cell = f"[{cve}]({link})" if link and cve else cve
+              lines.append(
+                  "| {cve} | {sev} | `{pkg}` | `{inst}` | `{fixed}` | {fixable} |".format(
+                      cve=cve_cell,
+                      sev=esc(row.get("Severity", "")),
+                      pkg=esc(row.get("Package", "")),
+                      inst=esc(row.get("Installed_Version", "")),
+                      fixed=esc(row.get("Fixed_By", "") or "—"),
+                      fixable=esc(row.get("Fixable", "")),
+                  )
+              )
+
+          if len(rows) > MAX_DETAIL_ROWS:
+              lines += [
+                  "",
+                  f"_Showing {MAX_DETAIL_ROWS} of {len(rows)} findings. "
+                  "Download the `scanquaycve-reports` artifact for the full CSV._",
+              ]
+          elif not rows:
+              lines += ["", "_No matching vulnerabilities._"]
+
+          lines.append("")
+          out.write_text("\n".join(lines), encoding="utf-8")
+          print(f"Wrote job summary from {summary_path} (total={total}, detail={len(shown)})")
           PY
 
       - name: Upload scan reports

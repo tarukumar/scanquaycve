@@ -43,6 +43,32 @@ def render_stats_table(stats: FindingStats) -> str:
     return "\n".join(lines)
 
 
+def render_findings_table(findings: list[Finding], *, max_rows: int = 200) -> str:
+    """Render a terminal table of findings including fix versions."""
+    if not findings:
+        return "No matching vulnerabilities."
+
+    header = (
+        f"{'CVE':<20} {'Severity':<10} {'Package':<28} "
+        f"{'Installed':<18} {'Fixed by':<18}"
+    )
+    lines = [header, "-" * len(header)]
+    shown = findings[:max_rows]
+    for finding in shown:
+        fixed = finding.fixed_by.strip() or "—"
+        lines.append(
+            f"{finding.cve:<20} {finding.severity:<10} "
+            f"{finding.package:<28} {finding.installed_version:<18} "
+            f"{fixed:<18}"
+        )
+    if len(findings) > max_rows:
+        lines.append(
+            f"... {len(findings) - max_rows} more "
+            f"(see all-vulnerabilities.csv for full list)"
+        )
+    return "\n".join(lines)
+
+
 def export_reports(
     findings: list[Finding],
     report_dir: str,

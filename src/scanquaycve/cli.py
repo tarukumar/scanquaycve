@@ -13,7 +13,7 @@ from scanquaycve.config import (
     parse_severity_names,
 )
 from scanquaycve.errors import ApiError, InvalidImageReference, TransportError
-from scanquaycve.export import render_stats_table
+from scanquaycve.export import render_findings_table, render_stats_table
 from scanquaycve.service import ScanOptions, run_scan
 
 
@@ -159,6 +159,8 @@ def main(argv: list[str] | None = None) -> None:
 
     print()
     print(render_stats_table(result.stats))
+    print()
+    print(render_findings_table(result.findings))
     print()
     print(f"Reports written to {result.report_dir}/")
     print(f"  all-vulnerabilities.csv ({result.stats.total} rows)")

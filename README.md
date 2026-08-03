@@ -69,7 +69,7 @@ Use **Actions → Scan Quay image → Run workflow** and pass an image reference
 
 For private Quay repos, add a repository secret named `QUAY_TOKEN` (OAuth token with `repo:read`).
 
-The run page shows a **job summary** (severity × fixability table). Reports are also uploaded as the `scanquaycve-reports` artifact. By default the job fails when matching vulnerabilities are found.
+The run page shows a **job summary** with severity counts and a findings table (CVE, package, installed version, Fixed by). Reports are also uploaded as the `scanquaycve-reports` artifact. By default the job fails when matching vulnerabilities are found.
 
 ### Options
 

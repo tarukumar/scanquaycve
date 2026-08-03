@@ -7,7 +7,11 @@ import json
 from pathlib import Path
 
 from scanquaycve.domain import summarize_findings
-from scanquaycve.export import export_reports, render_stats_table
+from scanquaycve.export import (
+    export_reports,
+    render_findings_table,
+    render_stats_table,
+)
 from tests.conftest import make_finding
 
 
@@ -56,3 +60,22 @@ def test_console_summary_contains_totals() -> None:
     assert "Critical" in text
     assert "TOTAL" in text
     assert "1" in text
+
+
+def test_console_findings_include_fix_versions() -> None:
+    findings = [
+        make_finding(
+            "CVE-1",
+            "Critical",
+            package="openssl",
+            version="1.1.1",
+            fixed_by="1.1.2",
+        ),
+        make_finding("CVE-2", "High", package="curl", version="7.0"),
+    ]
+    text = render_findings_table(findings)
+    assert "CVE-1" in text
+    assert "openssl" in text
+    assert "1.1.1" in text
+    assert "1.1.2" in text
+    assert "—" in text  # non-fixable Fixed by placeholder
